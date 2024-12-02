@@ -1,42 +1,35 @@
-# PetPartner
+# About Pet Partner
 
-**PetPartner** is your ultimate companion management addon for World of Warcraft. Automatically summon and manage random or favorite non-combat pets during your adventures with ease.
+**Pet Partner** is your ultimate companion management addon for World of Warcraft, lovingly crafted by **Kkthnx**. Enhance your gameplay by automatically summoning and managing non-combat pets during your adventures in Azeroth.
 
 ---
 
 ## Features
-
-- Automatically summon random pets during gameplay.
-- Restrict summoning to your favorite pets.
-- Blacklist specific pets you never want to summon.
-- Intuitive settings and options for complete customization.
-- Avoid summoning in instances with a simple toggle.
+- 🐾 Automatically summon random pets during gameplay.
+- ❤️ Restrict summoning to favorite pets with an easy toggle.
+- 🚫 Blacklist specific pets to avoid summoning them.
+- ⏱️ Configure a custom cooldown for pet summoning to throttle calls.
+- 🏰 Toggle pet summoning behavior in dungeons, raids, and battlegrounds (Experimental).
+- 🔍 Enable debugging options to monitor and log addon activity.
 
 ---
 
-## Why PetBuddy?
-
-Created by **Kkthnx**, PetPartner was designed to celebrate Azeroth's amazing collection of pets while making their management seamless. Focus on your adventures, and let PetPartner handle your companions!
+## Why Pet Partner Exists
+Pet Partner was created to celebrate Azeroth's delightful collection of pets. Designed by **Kkthnx**, this addon ensures players can enjoy their pet collections without the hassle of manual management. Focus on your journey, and let Pet Partner handle the rest!
 
 ---
 
 ## Slash Commands
-
-- `/petpartner` or `/pp` – Open the PetBuddy settings menu.
+- `/petpartner` or `/pp` - Open the Pet Partner settings menu.
 
 ---
 
-## Contributions
-
-Your support and feedback help improve PetBuddy. Consider contributing or reporting issues:
-
-- **Donate:** [Donate via PayPal](https://www.paypal.com/paypalme/kkthnxtv)
-- **Feedback/Report Issues:** [GitHub Repository](https://github.com/Kkthnx-Wow/PetPartner)
+## Support & Feedback
+Your support makes Pet Partner even better! Feel free to contribute, report bugs, or provide feedback:
+- [Donate via PayPal](https://www.paypal.com/paypalme/kkthnxtv)
+- [Report Issues or Feedback](https://github.com/Kkthnx-Wow/PetPartner)
 
 ---
 
 ## Support
-
-Have feedback, ideas, or bugs to report?  
-Reach out via the **GitHub Repository** or contact Kkthnx directly.  
-Thank you for using PetBuddy!
+Have feedback, ideas, or bugs to report? Click the links above or contact us directly. Thank you for using Pet Partner and for being a part of Azeroth’s wonderful community!
