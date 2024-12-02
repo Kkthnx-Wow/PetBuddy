@@ -1,0 +1,20 @@
+## Interface: 110005
+## Name: PetBuddy
+## Title: |cff5bc0bePet Buddy|r
+## Notes: Automatically summon and manage random or favorite non-combat pets for every adventure.|n|n|cff669DFFDeveloper|cffffffff:|r |nJosh "|CFF7b8489Kkthnx|r" Russell|n|n|cff009cdePayPal|r|cffffffff:|r |n|cffffffffwww.paypal.me/KkthnxTV|r|n|n|cfff96854Patreon|r|cffffffff:|r |n|cffffffffwww.patreon.com/Kkthnx|r
+## Author: Josh "Kkthnx" Russell
+## Version: 1.0.0
+## IconTexture: 132165
+## SavedVariables: PetBuddyDB, PetBuddyBlocklistDB
+## X-Support: TWW
+## X-Curse-Project-ID: 
+## X-Wago-ID: 
+
+# Libraries
+Libs\Dashi\embed.xml
+# Core
+PetBuddy.lua
+# Config
+Config\Settings.lua
+Config\Blacklist.lua
+Config\About.lua
