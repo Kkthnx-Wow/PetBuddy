@@ -2,57 +2,54 @@ local _, namespace = ...
 
 -- Function to create the About section canvas
 local function CreateAboutCanvas(canvas)
-	-- Set the canvas size and default padding
+	-- Set the canvas size
 	canvas:SetAllPoints(true)
 
 	-- Title
 	local title = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	title:SetPoint("TOP", canvas, "TOP", 0, -70)
-	title:SetText("|cffFFD700Pet Partner|r") -- Gold text color
+	title:SetText("|cffFFD700Pet Partner|r") -- Gold-colored title
 
 	-- Description
 	local description = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	description:SetPoint("TOP", title, "BOTTOM", 0, -10)
 	description:SetWidth(500)
-	description:SetText("Pet Partner is your ultimate companion management addon, created by Kkthnx. It enhances your gameplay experience by automatically summoning and managing random or favorite non-combat pets during your adventures!")
+	description:SetText("Pet Partner is your ultimate companion management addon, crafted by Kkthnx. Automatically summon random or favorite non-combat pets and enhance your adventures in Azeroth!")
 
-	-- Features Heading
+	-- Features Section
 	local featuresHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	featuresHeading:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -20)
 	featuresHeading:SetText("|cffFFD700Features:|r")
 
-	-- Features List
 	local features = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	features:SetPoint("TOPLEFT", featuresHeading, "BOTTOMLEFT", 0, -10)
 	features:SetWidth(500)
-	features:SetText("- Automatically summon random pets during gameplay.\n" .. "- Restrict summoning to your favorite pets.\n" .. "- Blacklist pets you never want to summon.\n" .. "- Intuitive settings and options for customization.\n" .. "- Event-based summoning and instance avoidance.")
+	features:SetText("- Automatically summon random pets during gameplay.\n" .. "- Restrict summoning to favorite pets with a toggle.\n" .. "- Blacklist pets you want to avoid summoning.\n" .. "- Set a custom cooldown for pet summoning to throttle calls.\n" .. "- Toggle pet summoning in dungeons, raids, and battlegrounds (Experimental).\n" .. "- Debugging options to monitor and log addon activity.")
 
-	-- Motivation Heading
-	local motivationHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	motivationHeading:SetPoint("TOPLEFT", features, "BOTTOMLEFT", 0, -20)
-	motivationHeading:SetText("|cffFFD700Why Pet Partner Exists:|r")
+	-- Purpose Section
+	local purposeHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+	purposeHeading:SetPoint("TOPLEFT", features, "BOTTOMLEFT", 0, -20)
+	purposeHeading:SetText("|cffFFD700Why Pet Partner Exists:|r")
 
-	-- Motivation Text
-	local motivation = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-	motivation:SetPoint("TOPLEFT", motivationHeading, "BOTTOMLEFT", 0, -10)
-	motivation:SetWidth(500)
-	motivation:SetText("As a passionate player of World of Warcraft, Kkthnx wanted to create an addon that not only celebrates Azeroth's wonderful collection of pets but also simplifies their management. Pet Partner lets you focus on your adventures while your pets join in seamlessly!")
+	local purpose = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	purpose:SetPoint("TOPLEFT", purposeHeading, "BOTTOMLEFT", 0, -10)
+	purpose:SetWidth(500)
+	purpose:SetText("Pet Partner was born out of a passion for Azeroth's delightful pets. Designed by Kkthnx, it helps players enjoy their collection without the hassle of manual pet management. Focus on your journey, and let Pet Partner handle the rest!")
 
-	-- Slash Commands Heading
+	-- Slash Commands Section
 	local commandsHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	commandsHeading:SetPoint("TOPLEFT", motivation, "BOTTOMLEFT", 0, -20)
+	commandsHeading:SetPoint("TOPLEFT", purpose, "BOTTOMLEFT", 0, -20)
 	commandsHeading:SetText("|cffFFD700Slash Commands:|r")
 
-	-- Slash Commands List
 	local commands = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	commands:SetPoint("TOPLEFT", commandsHeading, "BOTTOMLEFT", 0, -10)
 	commands:SetWidth(500)
 	commands:SetText("/petpartner or /pp - Open the Pet Partner settings menu.")
 
-	-- Contributions Heading
+	-- Contributions Section
 	local contributionsHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	contributionsHeading:SetPoint("TOPLEFT", commands, "BOTTOMLEFT", 0, -20)
-	contributionsHeading:SetText("|cffFFD700Contributions:|r")
+	contributionsHeading:SetText("|cffFFD700Support & Feedback:|r")
 
 	-- PayPal Button
 	local paypalButton = CreateFrame("Button", nil, canvas, "UIPanelButtonTemplate")
@@ -88,12 +85,11 @@ local function CreateAboutCanvas(canvas)
 		GameTooltip:Hide()
 	end)
 
-	-- Support Heading
+	-- Support Section
 	local supportHeading = canvas:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	supportHeading:SetPoint("TOPLEFT", feedbackButton, "BOTTOMLEFT", 0, -20)
 	supportHeading:SetText("|cffFFD700Support:|r")
 
-	-- Support Details
 	local support = canvas:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 	support:SetPoint("TOPLEFT", supportHeading, "BOTTOMLEFT", 0, -10)
 	support:SetWidth(500)

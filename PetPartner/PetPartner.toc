@@ -3,11 +3,11 @@
 ## Title: |cff5bc0bePet Partner|r
 ## Notes: Automatically summon and manage random or favorite non-combat pets for every adventure.|n|n|cff669DFFDeveloper|cffffffff:|r |nJosh "|CFF7b8489Kkthnx|r" Russell|n|n|cff009cdePayPal|r|cffffffff:|r |n|cffffffffwww.paypal.me/KkthnxTV|r|n|n|cfff96854Patreon|r|cffffffff:|r |n|cffffffffwww.patreon.com/Kkthnx|r
 ## Author: Josh "Kkthnx" Russell
-## Version: 1.0.0
+## Version: 1.0.1
 ## IconTexture: 132599
 ## SavedVariables: PetPartnerDB, PetPartnerBlocklistDB
 ## X-Support: TWW
-## X-Curse-Project-ID: 
+## X-Curse-Project-ID: 1151964
 ## X-Wago-ID: 
 
 # Libraries

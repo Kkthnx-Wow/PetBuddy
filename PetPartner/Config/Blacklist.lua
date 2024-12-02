@@ -121,7 +121,6 @@ end
 
 -- Register Pet Blocklist Canvas
 namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
-	-- Data Cache
 	local creatureIDs = setmetatable({}, {
 		__index = function(self, npcID)
 			local creatureID = GetCreatureModel(npcID)
@@ -142,14 +141,12 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 		end,
 	})
 
-	-- Grid Setup
 	local grid = namespace:CreateScrollGrid(canvas)
 	grid:SetInsets(10, 10, 10, 20)
 	grid:SetElementType("Button")
 	grid:SetElementSize(64)
 	grid:SetElementSpacing(4)
 
-	-- Element Load Setup
 	grid:SetElementOnLoad(function(element)
 		element:RegisterForClicks("RightButtonUp")
 
@@ -163,30 +160,27 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 		element:SetBackdropBorderColor(0.5, 0.5, 0.5)
 	end)
 
-	-- Element Update Setup
 	grid:SetElementOnUpdate(function(element, data)
 		local model = creatureIDs[data]
 		if model then
 			SetPortraitTextureFromCreatureDisplayID(element.model, model)
 		else
-			-- Retry loading model if unavailable
-			local timer = C_Timer.NewTicker(1, function()
+			local retryTimer
+			retryTimer = C_Timer.NewTicker(1, function()
 				local retryModel = creatureIDs[data]
 				if retryModel then
 					SetPortraitTextureFromCreatureDisplayID(element.model, retryModel)
-					timer:Cancel()
+					retryTimer:Cancel()
 				end
 			end)
 		end
 	end)
 
-	-- Element Click Setup
 	grid:SetElementOnScript("OnClick", function(element)
-		PetPartnerBlocklistDB.npcs[element.data] = nil -- Remove from blacklist
+		PetPartnerBlocklistDB.npcs[element.data] = nil
 		grid:RemoveData(element.data)
 	end)
 
-	-- Element Tooltip Setup
 	grid:SetElementOnScript("OnEnter", function(element)
 		GameTooltip:SetOwner(element, "ANCHOR_TOPLEFT")
 		GameTooltip:AddLine(creatureNames[element.data] or UNKNOWN, 1, 1, 1)
@@ -195,17 +189,14 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 		GameTooltip:Show()
 	end)
 
-	-- Populate Grid with Data
 	grid:AddDataByKeys(PetPartnerBlocklistDB.npcs)
 
-	-- Default Reset Handler
 	canvas:SetDefaultsHandler(function()
 		PetPartnerBlocklistDB.npcs = CopyTable(blocklistDefaults.npcs)
 		grid:ResetData()
 		grid:AddDataByKeys(PetPartnerBlocklistDB.npcs)
 	end)
 
-	-- Add Button for Adding New NPCs
 	createAddButton(canvas, namespace.L["Block a new Pet by ID or target"], function(data)
 		local npcID = tonumber(data)
 		if npcID then
@@ -215,17 +206,24 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 	end, "Target")
 end)
 
--- Initialization Function
+-- Improved Initialization Function
 function namespace:OnLoad()
-	-- Initialize blocklist database if not present
-	PetPartnerBlocklistDB = PetPartnerBlocklistDB or CopyTable(blocklistDefaults)
-
-	-- Inject new defaults into existing blocklist database
-	for kind, values in pairs(blocklistDefaults) do
-		for key, value in pairs(values) do
-			if PetPartnerBlocklistDB[kind][key] == nil then
-				PetPartnerBlocklistDB[kind][key] = value
+	-- Ensure blocklist database exists
+	if not PetPartnerBlocklistDB then
+		namespace:DebugPrint("Initializing blocklist database...")
+		PetPartnerBlocklistDB = CopyTable(blocklistDefaults)
+	else
+		-- Inject new defaults into existing database
+		for kind, values in pairs(blocklistDefaults) do
+			PetPartnerBlocklistDB[kind] = PetPartnerBlocklistDB[kind] or {}
+			for key, value in pairs(values) do
+				if PetPartnerBlocklistDB[kind][key] == nil then
+					PetPartnerBlocklistDB[kind][key] = value
+				end
 			end
 		end
 	end
+
+	-- Notify user if blocklist database was updated
+	namespace:DebugPrint("Blocklist database successfully initialized or updated.")
 end

@@ -1,138 +1,138 @@
--- Addon Name
 local _, namespace = ...
 
--- Tracks combat state
-local inCombat = false -- True if the player is in combat
-local initialized = false -- Tracks if initialization has occurred
+local summonedPetsCache = {}
+local lastSummonTime = 0
 
 -- Debugging utility
-local function DebugPrint(message, level)
+function namespace:DebugPrint(message)
 	if namespace:GetOption("enableDebug") then
-		level = level or "INFO" -- Default to INFO level
-		namespace:Print(string.format("[%s] %s", level, message))
+		namespace:Print(message)
 	end
 end
 
--- Check if the player is in a restricted instance (e.g., dungeon, raid)
+-- Check if the addon is enabled
+local function IsAddonEnabled()
+	return namespace:GetOption("enableAddon")
+end
+
+-- Check if the player is in a restricted instance
 local function IsPlayerInIgnoredInstance()
-	if namespace:GetOption("ignoreInInstances") then
-		local inInstance, instanceType = IsInInstance()
-		return inInstance and (instanceType == "party" or instanceType == "raid" or instanceType == "pvp")
+	local inInstance, instanceType = IsInInstance()
+	if not inInstance then
+		return false
 	end
-	return false
+
+	local instanceOptions = {
+		party = "enableInInstances",
+		raid = "enableInRaids",
+		pvp = "enableInBattlegrounds",
+		arena = "enableInBattlegrounds",
+	}
+
+	return not namespace:GetOption(instanceOptions[instanceType])
 end
 
--- Check if a pet is currently summoned
-local function IsPetSummoned()
-	local summonedGUID = C_PetJournal.GetSummonedPetGUID()
-	DebugPrint(string.format("Current summoned pet GUID: %s", summonedGUID or "None"), "DEBUG")
-	return summonedGUID ~= nil
+-- Reset summoned pets cache
+local function ResetSummonedPetsCache()
+	namespace:DebugPrint("Resetting summoned pets cache.")
+	summonedPetsCache = {}
 end
 
--- Filter summonable pets
-local function GetSummonablePets(blacklist, favoritesOnly)
-	local summonablePets = {}
+-- Validate blocklist database
+local function ValidateBlocklistDB()
+	if not PetPartnerBlocklistDB or type(PetPartnerBlocklistDB.pets) ~= "table" then
+		namespace:DebugPrint("Blocklist database invalid. Initializing...")
+		PetPartnerBlocklistDB = { pets = {} }
+	end
+end
+
+-- Summon a pet
+local function SummonPet()
+	local summonCooldown = namespace:GetOption("summonCooldown") or 1 -- Dynamically fetch cooldown
+	local currentTime = GetTime()
+
+	if currentTime - lastSummonTime < summonCooldown then
+		namespace:DebugPrint("SummonPet is on cooldown. Ignoring redundant calls.")
+		return
+	end
+
+	lastSummonTime = currentTime
+
+	if not IsAddonEnabled() then
+		namespace:DebugPrint("PetPartner is disabled.")
+		return
+	end
+
+	if InCombatLockdown() then
+		namespace:DebugPrint("Cannot summon a pet during combat.")
+		return
+	end
+
+	if IsPlayerInIgnoredInstance() then
+		namespace:DebugPrint("Ignored summoning pets in the current instance.")
+		return
+	end
+
+	if C_PetJournal.GetSummonedPetGUID() then
+		namespace:DebugPrint("A pet is already summoned.")
+		return
+	end
+
+	namespace:DebugPrint("Attempting to summon a pet...")
+	ValidateBlocklistDB()
+
 	local numPets = C_PetJournal.GetNumPets()
-
-	if numPets == 0 then
-		DebugPrint("No pets found in the journal.", "WARNING")
-		return summonablePets
-	end
+	local blacklist = PetPartnerBlocklistDB.pets
+	local summonablePets = {}
+	local summonFavoritesOnly = namespace:GetOption("summonFavoritesOnly")
 
 	for i = 1, numPets do
 		local petID, _, owned, _, _, favorite = C_PetJournal.GetPetInfoByIndex(i)
-		if petID and owned and not blacklist[petID] then
-			local isSummonable, error, errorText = C_PetJournal.GetPetSummonInfo(petID)
-			if isSummonable and error ~= Enum.PetJournalError.PetIsDead then
-				if not favoritesOnly or favorite then
-					table.insert(summonablePets, petID)
-				end
-			elseif error then
-				DebugPrint(string.format("Pet ID %s cannot be summoned. Error: %s (%s)", petID, error, errorText or "No additional information"), "ERROR")
+		local isSummonable, error = C_PetJournal.GetPetSummonInfo(petID)
+
+		if petID and owned and isSummonable and error == Enum.PetJournalError.None and not blacklist[petID] then
+			if (not summonFavoritesOnly or favorite) and not summonedPetsCache[petID] then
+				table.insert(summonablePets, petID)
 			end
 		end
 	end
 
 	if #summonablePets == 0 then
-		DebugPrint("No summonable pets available after filtering.", "WARNING")
-	else
-		DebugPrint(string.format("%d summonable pets found.", #summonablePets), "INFO")
+		ResetSummonedPetsCache()
+		namespace:DebugPrint("No valid pets found. Summoning aborted.")
+		return
 	end
 
-	return summonablePets
+	local randomIndex = math.random(1, #summonablePets)
+	local petToSummon = summonablePets[randomIndex]
+	C_PetJournal.SummonPetByGUID(petToSummon)
+	summonedPetsCache[petToSummon] = true
+	namespace:DebugPrint("Summoned a new pet successfully!")
 end
 
--- Summon a random pet
-local function SummonPet()
-	if InCombatLockdown() then
-		DebugPrint("Cannot summon a pet during combat.", "INFO")
-		return
-	end
-
-	if IsPlayerInIgnoredInstance() then
-		DebugPrint("Ignored summoning pets in the current instance.", "INFO")
-		return
-	end
-
-	if IsPetSummoned() then
-		DebugPrint("A pet is already summoned.", "INFO")
-		return
-	end
-
-	DebugPrint("Attempting to summon a pet...", "INFO")
-
-	local blacklist = PetPartnerBlocklistDB and PetPartnerBlocklistDB.npcs or {}
-	local favoritesOnly = namespace:GetOption("summonFavoritesOnly")
-	local summonablePets = GetSummonablePets(blacklist, favoritesOnly)
-
-	if #summonablePets > 0 then
-		local randomIndex = math.random(1, #summonablePets)
-		C_PetJournal.SummonPetByGUID(summonablePets[randomIndex])
-		DebugPrint("Summoned a random pet successfully!", "SUCCESS")
-	else
-		DebugPrint("No summonable pets available.", "ERROR")
-	end
-end
-
--- Unified summon check
-local function CheckAndSummonPet(triggerEvent)
-	if inCombat then
-		DebugPrint("Cannot process summon checks while in combat.", "INFO")
-		return
-	end
-
-	DebugPrint(string.format("Processing summon check for event: %s", triggerEvent))
-	C_Timer.After(2, SummonPet)
-end
-
--- Event Handlers
-function namespace:PLAYER_ENTERING_WORLD()
-	if initialized then
-		DebugPrint("PLAYER_ENTERING_WORLD fired after initialization, skipping additional handling.")
-		return
-	end
-
-	initialized = true -- Mark initialization as complete
-	DebugPrint("PLAYER_ENTERING_WORLD fired. Performing initial summon check.", "INFO")
-	C_Timer.After(2, function()
-		CheckAndSummonPet("PLAYER_ENTERING_WORLD")
-	end)
-end
-
-function namespace:ZONE_CHANGED_NEW_AREA()
-	DebugPrint("ZONE_CHANGED_NEW_AREA fired. Checking for pet summon.", "INFO")
-	CheckAndSummonPet("ZONE_CHANGED_NEW_AREA")
+-- Event handling
+function namespace:PLAYER_LOGIN()
+	namespace:DebugPrint("Player logged in. Checking for pet summon...")
+	SummonPet()
 end
 
 function namespace:PLAYER_REGEN_ENABLED()
-	inCombat = false -- Combat has ended
-	DebugPrint("Combat ended. Delaying pet summon check.", "INFO")
-	C_Timer.After(2, function()
-		CheckAndSummonPet("PLAYER_REGEN_ENABLED")
-	end)
+	namespace:DebugPrint("Combat ended. Checking for pet summon...")
+	SummonPet()
 end
 
 function namespace:PLAYER_REGEN_DISABLED()
-	inCombat = true -- Combat has started
-	DebugPrint("Combat started. Deferring pet summon checks.", "INFO")
+	namespace:DebugPrint("Combat started. Delaying pet summon...")
+end
+
+function namespace:ZONE_CHANGED_NEW_AREA()
+	namespace:DebugPrint("Zone changed. Checking for pet summon...")
+	SummonPet()
+end
+
+-- OnLoad function to ensure settings are ready
+function namespace:OnLoad()
+	namespace:DebugPrint("PetPartner addon loaded. Validating settings...")
+	ValidateBlocklistDB()
+	ResetSummonedPetsCache()
 end
