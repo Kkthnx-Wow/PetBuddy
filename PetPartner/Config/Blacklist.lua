@@ -182,7 +182,7 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 
 	-- Element Click Setup
 	grid:SetElementOnScript("OnClick", function(element)
-		PetBuddyBlocklistDB.npcs[element.data] = nil -- Remove from blacklist
+		PetPartnerBlocklistDB.npcs[element.data] = nil -- Remove from blacklist
 		grid:RemoveData(element.data)
 	end)
 
@@ -196,20 +196,20 @@ namespace:RegisterSubSettingsCanvas("Pet Blocklist", function(canvas)
 	end)
 
 	-- Populate Grid with Data
-	grid:AddDataByKeys(PetBuddyBlocklistDB.npcs)
+	grid:AddDataByKeys(PetPartnerBlocklistDB.npcs)
 
 	-- Default Reset Handler
 	canvas:SetDefaultsHandler(function()
-		PetBuddyBlocklistDB.npcs = CopyTable(blocklistDefaults.npcs)
+		PetPartnerBlocklistDB.npcs = CopyTable(blocklistDefaults.npcs)
 		grid:ResetData()
-		grid:AddDataByKeys(PetBuddyBlocklistDB.npcs)
+		grid:AddDataByKeys(PetPartnerBlocklistDB.npcs)
 	end)
 
 	-- Add Button for Adding New NPCs
-	createAddButton(canvas, namespace.L["Block a new NPC by ID or target"], function(data)
+	createAddButton(canvas, namespace.L["Block a new Pet by ID or target"], function(data)
 		local npcID = tonumber(data)
 		if npcID then
-			PetBuddyBlocklistDB.npcs[npcID] = true
+			PetPartnerBlocklistDB.npcs[npcID] = true
 			grid:AddData(npcID)
 		end
 	end, "Target")
@@ -218,13 +218,13 @@ end)
 -- Initialization Function
 function namespace:OnLoad()
 	-- Initialize blocklist database if not present
-	PetBuddyBlocklistDB = PetBuddyBlocklistDB or CopyTable(blocklistDefaults)
+	PetPartnerBlocklistDB = PetPartnerBlocklistDB or CopyTable(blocklistDefaults)
 
 	-- Inject new defaults into existing blocklist database
 	for kind, values in pairs(blocklistDefaults) do
 		for key, value in pairs(values) do
-			if PetBuddyBlocklistDB[kind][key] == nil then
-				PetBuddyBlocklistDB[kind][key] = value
+			if PetPartnerBlocklistDB[kind][key] == nil then
+				PetPartnerBlocklistDB[kind][key] = value
 			end
 		end
 	end

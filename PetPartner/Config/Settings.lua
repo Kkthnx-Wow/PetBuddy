@@ -1,21 +1,21 @@
 -- Addon Name
-local addonName, namespace = ...
+local _, namespace = ...
 
 -- Initialize settings with Dashi
-namespace:RegisterSettings("PetBuddyDB", {
+namespace:RegisterSettings("PetPartnerDB", {
 	{
 		key = "enableDebug",
 		type = "toggle",
 		title = "Enable Debugging",
 		tooltip = "Toggle debugging messages for the addon.",
-		default = true,
+		default = false,
 	},
 	{
 		key = "ignoreInInstances",
 		type = "toggle",
 		title = "Ignore Summoning in Instances",
 		tooltip = "Prevent pet summoning in restricted instances.",
-		default = true,
+		default = false,
 	},
 	{
 		key = "summonFavoritesOnly",
@@ -27,4 +27,4 @@ namespace:RegisterSettings("PetBuddyDB", {
 })
 
 -- Register Slash Command for Settings
-namespace:RegisterSettingsSlash("/petbuddy", "/pb")
+namespace:RegisterSettingsSlash("/petpartner", "/pp")
