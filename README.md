@@ -1,6 +1,6 @@
-# PetBuddy
+# PetPartner
 
-**PetBuddy** is your ultimate companion management addon for World of Warcraft. Automatically summon and manage random or favorite non-combat pets during your adventures with ease.
+**PetPartner** is your ultimate companion management addon for World of Warcraft. Automatically summon and manage random or favorite non-combat pets during your adventures with ease.
 
 ---
 
@@ -16,13 +16,13 @@
 
 ## Why PetBuddy?
 
-Created by **Kkthnx**, PetBuddy was designed to celebrate Azeroth's amazing collection of pets while making their management seamless. Focus on your adventures, and let PetBuddy handle your companions!
+Created by **Kkthnx**, PetPartner was designed to celebrate Azeroth's amazing collection of pets while making their management seamless. Focus on your adventures, and let PetPartner handle your companions!
 
 ---
 
 ## Slash Commands
 
-- `/petbuddy` or `/pb` – Open the PetBuddy settings menu.
+- `/petpartner` or `/pp` – Open the PetBuddy settings menu.
 
 ---
 
@@ -31,7 +31,7 @@ Created by **Kkthnx**, PetBuddy was designed to celebrate Azeroth's amazing coll
 Your support and feedback help improve PetBuddy. Consider contributing or reporting issues:
 
 - **Donate:** [Donate via PayPal](https://www.paypal.com/paypalme/kkthnxtv)
-- **Feedback/Report Issues:** [GitHub Repository](https://github.com/Kkthnx-Wow/PetBuddy)
+- **Feedback/Report Issues:** [GitHub Repository](https://github.com/Kkthnx-Wow/PetPartner)
 
 ---
 
