@@ -1,6 +1,6 @@
 local _, namespace = ...
 
-local summonedPetsCache = {} -- Cache for tracking already summoned pets
+local summonedPetsCache = {}
 local lastSummonTime = 0
 
 -- Constants for option keys
@@ -49,13 +49,11 @@ end
 
 -- Format the pet announcement message
 local function FormatPetAnnouncement(petID)
-	-- Validate petID
 	if not petID or petID == "0" then
 		namespace:DebugPrint("Invalid petID detected. Skipping announcement.")
 		return nil
 	end
 
-	-- Fetch pet info
 	local petLink = C_PetJournal.GetBattlePetLink(petID)
 	if not petLink then
 		namespace:DebugPrint("Failed to retrieve Battle Pet link. Skipping announcement.")
@@ -68,7 +66,6 @@ local function FormatPetAnnouncement(petID)
 		return nil
 	end
 
-	-- Pet type icons
 	local petTypeIcons = {
 		[1] = "|TInterface\\Icons\\Icon_PetFamily_Humanoid:16|t",
 		[2] = "|TInterface\\Icons\\Icon_PetFamily_Dragon:16|t",
