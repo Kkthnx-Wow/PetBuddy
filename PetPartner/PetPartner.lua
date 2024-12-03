@@ -1,7 +1,13 @@
 local _, namespace = ...
 
-local summonedPetsCache = {}
+local summonedPetsCache = {} -- Cache for tracking already summoned pets
 local lastSummonTime = 0
+
+-- Constants for option keys
+local OPTION_ENABLE_ADDON = "enableAddon"
+local OPTION_SUMMON_COOLDOWN = "summonCooldown"
+local OPTION_SUMMON_ANNOUNCEMENTS = "showSummonAnnouncements"
+local OPTION_SUMMON_FAVORITES_ONLY = "summonFavoritesOnly"
 
 -- Debugging utility
 function namespace:DebugPrint(message)
@@ -30,7 +36,7 @@ end
 -- Reset summoned pets cache
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
-	summonedPetsCache = {}
+	wipe(summonedPetsCache)
 end
 
 -- Validate blocklist database
@@ -41,9 +47,49 @@ local function ValidateBlocklistDB()
 	end
 end
 
+-- Format the pet announcement message
+local function FormatPetAnnouncement(petID)
+	-- Validate petID
+	if not petID or petID == "0" then
+		namespace:DebugPrint("Invalid petID detected. Skipping announcement.")
+		return nil
+	end
+
+	-- Fetch pet info
+	local petLink = C_PetJournal.GetBattlePetLink(petID)
+	if not petLink then
+		namespace:DebugPrint("Failed to retrieve Battle Pet link. Skipping announcement.")
+		return nil
+	end
+
+	local _, _, _, _, _, _, _, petName, icon, petType = C_PetJournal.GetPetInfoByPetID(petID)
+	if not petName then
+		namespace:DebugPrint("Invalid pet data. Skipping announcement.")
+		return nil
+	end
+
+	-- Pet type icons
+	local petTypeIcons = {
+		[1] = "|TInterface\\Icons\\Icon_PetFamily_Humanoid:16|t",
+		[2] = "|TInterface\\Icons\\Icon_PetFamily_Dragon:16|t",
+		[3] = "|TInterface\\Icons\\Icon_PetFamily_Flying:16|t",
+		[4] = "|TInterface\\Icons\\Icon_PetFamily_Undead:16|t",
+		[5] = "|TInterface\\Icons\\Icon_PetFamily_Critter:16|t",
+		[6] = "|TInterface\\Icons\\Icon_PetFamily_Magical:16|t",
+		[7] = "|TInterface\\Icons\\Icon_PetFamily_Elemental:16|t",
+		[8] = "|TInterface\\Icons\\Icon_PetFamily_Beast:16|t",
+		[9] = "|TInterface\\Icons\\Icon_PetFamily_Water:16|t",
+		[10] = "|TInterface\\Icons\\Icon_PetFamily_Mechanical:16|t",
+	}
+	local petTypeIcon = petTypeIcons[petType] or "|TInterface\\Icons\\INV_Misc_QuestionMark:16|t"
+	local petIcon = icon or "Interface\\Icons\\INV_Misc_QuestionMark"
+
+	return string.format("PetPartner has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink)
+end
+
 -- Summon a pet
 local function SummonPet()
-	local summonCooldown = namespace:GetOption("summonCooldown") or 1 -- Dynamically fetch cooldown
+	local summonCooldown = namespace:GetOption(OPTION_SUMMON_COOLDOWN) or 1
 	local currentTime = GetTime()
 
 	if currentTime - lastSummonTime < summonCooldown then
@@ -53,7 +99,7 @@ local function SummonPet()
 
 	lastSummonTime = currentTime
 
-	if not namespace:GetOption("enableAddon") then
+	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
 		namespace:DebugPrint("PetPartner is disabled.")
 		return
 	end
@@ -79,14 +125,13 @@ local function SummonPet()
 	local numPets = C_PetJournal.GetNumPets()
 	local blacklist = PetPartnerBlocklistDB.pets
 	local summonablePets = {}
-	local summonFavoritesOnly = namespace:GetOption("summonFavoritesOnly")
+	local summonFavoritesOnly = namespace:GetOption(OPTION_SUMMON_FAVORITES_ONLY)
 
 	for i = 1, numPets do
-		local petID, _, owned, _, _, favorite = C_PetJournal.GetPetInfoByIndex(i)
+		local petID, _, owned, _, _, favorite, _, _, _, _, companionID = C_PetJournal.GetPetInfoByIndex(i)
 		local isSummonable, error = C_PetJournal.GetPetSummonInfo(petID)
-		local _, _, _, _, _, _, _, _, _, _, creatureID = C_PetJournal.GetPetInfoByPetID(petID)
 
-		if petID and owned and isSummonable and error == Enum.PetJournalError.None and not blacklist[creatureID] then
+		if petID and owned and isSummonable and error == Enum.PetJournalError.None and not blacklist[companionID] then
 			if (not summonFavoritesOnly or favorite) and not summonedPetsCache[petID] then
 				table.insert(summonablePets, petID)
 			end
@@ -94,8 +139,8 @@ local function SummonPet()
 	end
 
 	if #summonablePets == 0 then
-		ResetSummonedPetsCache()
-		namespace:DebugPrint("No valid pets found. Summoning aborted.")
+		namespace:DebugPrint("No valid pets found in the custom filter. Summoning a random pet.")
+		C_PetJournal.SummonRandomPet(summonFavoritesOnly)
 		return
 	end
 
@@ -104,38 +149,11 @@ local function SummonPet()
 	C_PetJournal.SummonPetByGUID(petToSummon)
 	summonedPetsCache[petToSummon] = true
 
-	if namespace:GetOption("showSummonAnnouncements") then
-		local speciesID, customName, _, _, _, _, _, petName, icon, petType = C_PetJournal.GetPetInfoByPetID(petToSummon)
-		local _, _, _, _, rarity = C_PetJournal.GetPetStats(petToSummon)
-		local displayName = customName or petName
-
-		local qualityColors = {
-			[1] = "9d9d9d",
-			[2] = "ffffff",
-			[3] = "1eff00",
-			[4] = "0070dd",
-			[5] = "a335ee",
-			[6] = "ff8000",
-		}
-		local qualityColor = qualityColors[rarity] or "ffffff"
-
-		local petTypeIcons = {
-			[1] = "|TInterface\\Icons\\Icon_PetFamily_Humanoid:16|t",
-			[2] = "|TInterface\\Icons\\Icon_PetFamily_Dragon:16|t",
-			[3] = "|TInterface\\Icons\\Icon_PetFamily_Flying:16|t",
-			[4] = "|TInterface\\Icons\\Icon_PetFamily_Undead:16|t",
-			[5] = "|TInterface\\Icons\\Icon_PetFamily_Critter:16|t",
-			[6] = "|TInterface\\Icons\\Icon_PetFamily_Magical:16|t",
-			[7] = "|TInterface\\Icons\\Icon_PetFamily_Elemental:16|t",
-			[8] = "|TInterface\\Icons\\Icon_PetFamily_Beast:16|t",
-			[9] = "|TInterface\\Icons\\Icon_PetFamily_Water:16|t",
-			[10] = "|TInterface\\Icons\\Icon_PetFamily_Mechanical:16|t",
-		}
-		local petTypeIcon = petTypeIcons[petType] or "|TInterface\\Icons\\INV_Misc_QuestionMark:16|t"
-		local petIcon = icon or "Interface\\Icons\\INV_Misc_QuestionMark"
-		local petLink = string.format("|cff%s|Hbattlepet:%d:25:3:1224:276:276:0|h[%s]|h|r", qualityColor, speciesID, displayName)
-
-		namespace:Print(string.format("has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink))
+	if namespace:GetOption(OPTION_SUMMON_ANNOUNCEMENTS) then
+		local announcement = FormatPetAnnouncement(petToSummon)
+		if announcement then
+			namespace:Print(announcement)
+		end
 	end
 
 	namespace:DebugPrint("Summoned a new pet successfully!")
@@ -161,7 +179,6 @@ function namespace:ZONE_CHANGED_NEW_AREA()
 	SummonPet()
 end
 
--- OnLoad function to ensure settings are ready
 function namespace:OnLoad()
 	namespace:DebugPrint("PetPartner addon loaded. Validating settings...")
 	ValidateBlocklistDB()
