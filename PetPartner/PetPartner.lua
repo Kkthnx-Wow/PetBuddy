@@ -58,7 +58,7 @@ local function SummonPet()
 
 	lastSummonTime = currentTime
 
-	if not IsAddonEnabled() then
+	if not namespace:GetOption("enableAddon") then
 		namespace:DebugPrint("PetPartner is disabled.")
 		return
 	end
@@ -107,6 +107,47 @@ local function SummonPet()
 	local petToSummon = summonablePets[randomIndex]
 	C_PetJournal.SummonPetByGUID(petToSummon)
 	summonedPetsCache[petToSummon] = true
+
+	-- Announce the summoned pet if the option is enabled
+	if namespace:GetOption("showSummonAnnouncements") then
+		local speciesID, customName, _, _, _, _, _, petName, icon, petType = C_PetJournal.GetPetInfoByPetID(petToSummon)
+		local _, _, _, _, rarity = C_PetJournal.GetPetStats(petToSummon) -- Fetch pet stats, including rarity
+		local displayName = customName or petName
+
+		-- Quality colors based on rarity
+		local qualityColors = {
+			[1] = "9d9d9d", -- Poor (Gray)
+			[2] = "ffffff", -- Common (White)
+			[3] = "1eff00", -- Uncommon (Green)
+			[4] = "0070dd", -- Rare (Blue)
+			[5] = "a335ee", -- Epic (Purple)
+			[6] = "ff8000", -- Legendary (Orange)
+		}
+		local qualityColor = qualityColors[rarity] or "ffffff" -- Default to white if rarity is invalid
+
+		-- Pet type icons
+		local petTypeIcons = {
+			[1] = "|TInterface\\Icons\\Icon_PetFamily_Humanoid:16|t", -- Humanoid
+			[2] = "|TInterface\\Icons\\Icon_PetFamily_Dragon:16|t", -- Dragonkin
+			[3] = "|TInterface\\Icons\\Icon_PetFamily_Flying:16|t", -- Flying
+			[4] = "|TInterface\\Icons\\Icon_PetFamily_Undead:16|t", -- Undead
+			[5] = "|TInterface\\Icons\\Icon_PetFamily_Critter:16|t", -- Critter
+			[6] = "|TInterface\\Icons\\Icon_PetFamily_Magical:16|t", -- Magic
+			[7] = "|TInterface\\Icons\\Icon_PetFamily_Elemental:16|t", -- Elemental
+			[8] = "|TInterface\\Icons\\Icon_PetFamily_Beast:16|t", -- Beast
+			[9] = "|TInterface\\Icons\\Icon_PetFamily_Water:16|t", -- Aquatic
+			[10] = "|TInterface\\Icons\\Icon_PetFamily_Mechanical:16|t", -- Mechanical
+		}
+		local petTypeIcon = petTypeIcons[petType] or "|TInterface\\Icons\\INV_Misc_QuestionMark:16|t" -- Fallback for invalid types
+		local petIcon = icon or "Interface\\Icons\\INV_Misc_QuestionMark" -- Fallback for invalid icons
+
+		-- Proper clickable and hoverable pet link with pet icon and type icon
+		local petLink = string.format("|cff%s|Hbattlepet:%d:25:3:1224:276:276:0|h[%s]|h|r", qualityColor, speciesID, displayName)
+
+		-- Print message with both icons and the pet name
+		namespace:Print(string.format("has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink))
+	end
+
 	namespace:DebugPrint("Summoned a new pet successfully!")
 end
 

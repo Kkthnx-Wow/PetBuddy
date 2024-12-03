@@ -15,7 +15,7 @@ namespace:RegisterSettings("PetPartnerDB", {
 		type = "toggle",
 		title = "Enable Debugging",
 		tooltip = "Toggle debugging messages for the addon.",
-		default = true,
+		default = false,
 	},
 	{
 		key = "enableInInstances",
@@ -50,11 +50,18 @@ namespace:RegisterSettings("PetPartnerDB", {
 		type = "slider",
 		title = "Summon Cooldown",
 		tooltip = "Set the cooldown time in seconds for summoning pets. This helps to throttle summon calls.",
-		default = 1, -- Default cooldown of 1 second
-		minValue = 0, -- Minimum cooldown of 0 seconds
-		maxValue = 60, -- Maximum cooldown of 300 seconds
-		valueStep = 1, -- Step increment for the cooldown value
-		valueFormat = "%.0f seconds", -- Format for displaying the cooldown value
+		default = 1,
+		minValue = 0,
+		maxValue = 60,
+		valueStep = 1,
+		valueFormat = "%.0f seconds",
+	},
+	{
+		key = "showSummonAnnouncements",
+		type = "toggle",
+		title = "Show Summon Announcements",
+		tooltip = "Enable or disable chat messages showing details about the summoned pet.",
+		default = false,
 	},
 })
 
