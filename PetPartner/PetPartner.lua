@@ -1,19 +1,42 @@
 local _, namespace = ...
 
-local summonedPetsCache = {}
-local lastSummonTime = 0
-
--- Constants for option keys
+-- Constants
 local OPTION_ENABLE_ADDON = "enableAddon"
 local OPTION_SUMMON_COOLDOWN = "summonCooldown"
 local OPTION_SUMMON_ANNOUNCEMENTS = "showSummonAnnouncements"
 local OPTION_SUMMON_FAVORITES_ONLY = "summonFavoritesOnly"
+local CAMO_SPELLS = { 198783, 199483 } -- List of camouflage-related spells
 
--- Debugging utility
+-- Variables
+local summonedPetsCache = {}
+local lastSummonTime = 0
+local isPlayerDead = false
+
+--- Debugging Utility
 function namespace:DebugPrint(message)
 	if namespace:GetOption("enableDebug") then
 		namespace:Print(message)
 	end
+end
+
+--- Utility Functions
+
+-- Check if the player has an aura from a given list
+local function PlayerHasAuraInList(auraList)
+	local i = 1
+	while true do
+		local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+		if not aura then
+			break
+		end
+		for _, spellID in ipairs(auraList) do
+			if aura.spellId == spellID then
+				return true
+			end
+		end
+		i = i + 1
+	end
+	return false
 end
 
 -- Check if the player is in a restricted instance
@@ -33,13 +56,13 @@ local function IsPlayerInIgnoredInstance()
 	return not namespace:GetOption(instanceOptions[instanceType])
 end
 
--- Reset summoned pets cache
+-- Reset the summoned pets cache
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
 	wipe(summonedPetsCache)
 end
 
--- Validate blocklist database
+-- Validate the blocklist database
 local function ValidateBlocklistDB()
 	if not PetPartnerBlocklistDB or type(PetPartnerBlocklistDB.pets) ~= "table" then
 		namespace:DebugPrint("Blocklist database invalid. Initializing...")
@@ -47,7 +70,7 @@ local function ValidateBlocklistDB()
 	end
 end
 
--- Format the pet announcement message
+-- Format a pet announcement message
 local function FormatPetAnnouncement(petID)
 	if not petID or petID == "0" then
 		namespace:DebugPrint("Invalid petID detected. Skipping announcement.")
@@ -84,8 +107,27 @@ local function FormatPetAnnouncement(petID)
 	return string.format("PetPartner has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink)
 end
 
+--- Core Functions
+
+-- Dismiss the currently summoned pet
+function namespace:DismissPet()
+	local currentPetGUID = C_PetJournal.GetSummonedPetGUID()
+
+	if currentPetGUID and currentPetGUID ~= "" then
+		namespace:DebugPrint("Dismissing pet with GUID: " .. currentPetGUID)
+		C_PetJournal.SummonPetByGUID(currentPetGUID)
+	else
+		namespace:DebugPrint("No pet to dismiss.")
+	end
+end
+
 -- Summon a pet
 local function SummonPet()
+	if isPlayerDead then
+		namespace:DebugPrint("Player is dead. Summoning is disabled.")
+		return
+	end
+
 	local summonCooldown = namespace:GetOption(OPTION_SUMMON_COOLDOWN) or 1
 	local currentTime = GetTime()
 
@@ -156,28 +198,55 @@ local function SummonPet()
 	namespace:DebugPrint("Summoned a new pet successfully!")
 end
 
--- Event handling
+--- Event Handlers
 function namespace:PLAYER_LOGIN()
-	namespace:DebugPrint("Player logged in. Checking for pet summon...")
 	SummonPet()
 end
-
 function namespace:PLAYER_REGEN_ENABLED()
-	namespace:DebugPrint("Combat ended. Checking for pet summon...")
 	SummonPet()
 end
-
 function namespace:PLAYER_REGEN_DISABLED()
-	namespace:DebugPrint("Combat started. Delaying pet summon...")
+	namespace:DebugPrint("Combat started. Pet summoning is delayed.")
+end
+function namespace:ZONE_CHANGED()
+	SummonPet()
+end
+function namespace:ZONE_CHANGED_INDOORS()
+	SummonPet()
+end
+function namespace:ZONE_CHANGED_NEW_AREA()
+	SummonPet()
+end
+function namespace:PLAYER_UPDATE_RESTING()
+	SummonPet()
 end
 
-function namespace:ZONE_CHANGED_NEW_AREA()
-	namespace:DebugPrint("Zone changed. Checking for pet summon...")
+-- Handle Player Death
+function namespace:PLAYER_DEAD()
+	isPlayerDead = true
+	namespace:DebugPrint("Player has died. Disabling pet summoning.")
+end
+
+-- Handle Player Resurrection
+function namespace:PLAYER_UNGHOST()
+	isPlayerDead = false
+	namespace:DebugPrint("Player has resurrected. Enabling pet summoning.")
 	SummonPet()
+end
+
+-- Stealth Handler
+function namespace:UPDATE_STEALTH()
+	if IsStealthed() and not PlayerHasAuraInList(CAMO_SPELLS) then
+		namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
+		self:DismissPet()
+	else
+		namespace:DebugPrint("Player is not stealthed or has camouflage. Ready to summon a pet.")
+		SummonPet()
+	end
 end
 
 function namespace:OnLoad()
-	namespace:DebugPrint("PetPartner addon loaded. Validating settings...")
+	namespace:DebugPrint("PetPartner addon loaded. Initializing...")
 	ValidateBlocklistDB()
 	ResetSummonedPetsCache()
 end
