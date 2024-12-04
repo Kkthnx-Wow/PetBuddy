@@ -169,7 +169,7 @@ local function TrySummonPet()
 	ValidateBlocklistDB()
 
 	local numPets = C_PetJournal.GetNumPets()
-	local blacklist = PetPartnerBlocklistDB.pets
+	local blacklist = PetPartnerBlocklistDB.npcs
 	local summonablePets = {}
 	local summonFavoritesOnly = namespace:GetOption(OPTION_SUMMON_FAVORITES_ONLY)
 
