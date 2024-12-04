@@ -63,6 +63,13 @@ namespace:RegisterSettings("PetPartnerDB", {
 		tooltip = "Enable or disable chat messages showing details about the summoned pet.",
 		default = false,
 	},
+	{
+		key = "dismissWhileStealthed",
+		type = "toggle",
+		title = "Dismiss Pets While Stealthed",
+		tooltip = "Enable or disable dismissing pets while the player is stealthed.",
+		default = true,
+	},
 })
 
 -- Register Slash Command for Settings

@@ -143,8 +143,8 @@ local function UpdatePlayerVehicleState(unit)
 end
 
 local function UpdateDynamicPlayerStates()
-	local isFlying = IsFlying()
-	local isFalling = IsFalling()
+	local isFlying = IsFlying() or false
+	local isFalling = IsFalling() or false
 
 	if playerStates.playerIsFlying ~= isFlying then
 		UpdatePlayerState("playerIsFlying", isFlying)
@@ -184,20 +184,32 @@ end
 
 local function TrySummonPet()
 	LogPlayerStates()
-	if playerStates.isPlayerDead or playerStates.playerIsEating or playerStates.playerIsInvisible or playerStates.playerIsInCombat or playerStates.playerIsFlying or playerStates.playerIsFalling or playerStates.playerIsInVehicle or playerStates.playerIsLooting or playerStates.playerIsSitting then
-		namespace:DebugPrint("Cannot summon pet due to player state (Sitting included).")
-		return
+
+	local disallowedStates = {
+		isPlayerDead = "Player is dead",
+		playerIsEating = "Player is eating",
+		playerIsInvisible = "Player is invisible",
+		playerIsInCombat = "Player is in combat",
+		playerIsFlying = "Player is flying",
+		playerIsFalling = "Player is falling",
+		playerIsInVehicle = "Player is in a vehicle",
+		playerIsLooting = "Player is looting",
+		playerIsSitting = "Player is sitting",
+	}
+
+	for state, reason in pairs(disallowedStates) do
+		if playerStates[state] then
+			namespace:DebugPrint("Cannot summon pet: " .. reason)
+			return
+		end
 	end
 
 	local summonCooldown = namespace:GetOption(OPTION_SUMMON_COOLDOWN) or 1
-	local currentTime = GetTime()
-
-	if currentTime - lastSummonTime < summonCooldown then
+	if GetTime() - lastSummonTime < summonCooldown then
 		namespace:DebugPrint("SummonPet is on cooldown. Ignoring redundant calls.")
 		return
 	end
-
-	lastSummonTime = currentTime
+	lastSummonTime = GetTime()
 
 	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
 		namespace:DebugPrint("PetPartner is disabled.")
@@ -217,12 +229,13 @@ local function TrySummonPet()
 	namespace:DebugPrint("Processing summoning delay...")
 	C_Timer.After(1, function()
 		namespace:DebugPrint("Attempting to summon a pet after delay...")
+
 		ValidateBlocklistDB()
 
 		local numPets = C_PetJournal.GetNumPets()
-		local blacklist = PetPartnerBlocklistDB.npcs
-		local summonablePets = {}
+		local blacklist = PetPartnerBlocklistDB.npcs or {}
 		local summonFavoritesOnly = namespace:GetOption(OPTION_SUMMON_FAVORITES_ONLY)
+		local summonablePets = {}
 
 		for i = 1, numPets do
 			local petID, _, owned, _, _, favorite, _, _, _, _, companionID = C_PetJournal.GetPetInfoByIndex(i)
@@ -241,8 +254,7 @@ local function TrySummonPet()
 			return
 		end
 
-		local randomIndex = math.random(1, #summonablePets)
-		local petToSummon = summonablePets[randomIndex]
+		local petToSummon = summonablePets[math.random(#summonablePets)]
 		C_PetJournal.SummonPetByGUID(petToSummon)
 		summonedPetsCache[petToSummon] = true
 
@@ -342,9 +354,14 @@ function namespace:PLAYER_UNGHOST()
 end
 
 function namespace:UPDATE_STEALTH()
+	local dismissWhileStealthed = namespace:GetOption("dismissWhileStealthed")
 	if IsStealthed() and not PlayerHasAuraInList(CAMO_SPELLS) then
-		namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
-		self:DismissPet()
+		if dismissWhileStealthed then
+			namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
+			self:DismissPet()
+		else
+			namespace:DebugPrint("Player is stealthed but dismissing pets while stealthed is disabled.")
+		end
 	else
 		TrySummonPet()
 	end
