@@ -79,9 +79,9 @@ end
 
 -- Validate the blocklist database
 local function ValidateBlocklistDB()
-	if not PetPartnerBlocklistDB or type(PetPartnerBlocklistDB.pets) ~= "table" then
+	if not PetPartnerBlocklistDB or type(PetPartnerBlocklistDB.npcs) ~= "table" then
 		namespace:DebugPrint("Blocklist database invalid. Initializing...")
-		PetPartnerBlocklistDB = { pets = {} }
+		PetPartnerBlocklistDB = { npcs = {} }
 	end
 end
 
