@@ -124,7 +124,7 @@ local function FormatPetAnnouncement(petID)
 	local petTypeIcon = petTypeIcons[petType] or "|TInterface\\Icons\\INV_Misc_QuestionMark:16|t"
 	local petIcon = icon or "Interface\\Icons\\INV_Misc_QuestionMark"
 
-	return string.format("PetPartner has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink)
+	return string.format("has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink)
 end
 
 local function UpdatePlayerState(key, value)
