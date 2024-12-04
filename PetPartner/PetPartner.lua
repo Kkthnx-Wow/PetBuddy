@@ -135,8 +135,8 @@ function namespace:DismissPet()
 end
 
 local function TrySummonPet()
-	if isPlayerDead or playerIsEating or playerIsInvisible or playerIsInCombat then
-		namespace:DebugPrint("Cannot summon pet. Dead: " .. tostring(isPlayerDead) .. ", Eating: " .. tostring(playerIsEating) .. ", Invisible: " .. tostring(playerIsInvisible) .. ", In Combat: " .. tostring(playerIsInCombat))
+	if isPlayerDead or playerIsEating or playerIsInvisible or playerIsInCombat or IsFlying() then
+		namespace:DebugPrint("Cannot summon pet. Dead: " .. tostring(isPlayerDead) .. ", Eating: " .. tostring(playerIsEating) .. ", Invisible: " .. tostring(playerIsInvisible) .. ", In Combat: " .. tostring(playerIsInCombat) .. ", Flying: " .. tostring(IsFlying()))
 		return
 	end
 
@@ -235,6 +235,12 @@ function namespace:UNIT_AURA(unit)
 end
 
 function namespace:PLAYER_ENTERING_WORLD()
+	if IsPlayerInIgnoredInstance() then
+		namespace:DebugPrint("Player is in a restricted instance. Pet summoning is disabled.")
+		return
+	end
+
+	namespace:DebugPrint("Player entering the world. Attempting to summon a pet.")
 	TrySummonPet()
 end
 
