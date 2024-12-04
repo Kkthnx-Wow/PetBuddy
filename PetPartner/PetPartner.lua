@@ -5,36 +5,51 @@ local OPTION_ENABLE_ADDON = "enableAddon"
 local OPTION_SUMMON_COOLDOWN = "summonCooldown"
 local OPTION_SUMMON_ANNOUNCEMENTS = "showSummonAnnouncements"
 local OPTION_SUMMON_FAVORITES_ONLY = "summonFavoritesOnly"
-local CAMO_SPELLS = { 198783, 199483 } -- List of camouflage-related spells
+local INVIS_SPELLS = { 66, 11392, 3680 }
+local CAMO_SPELLS = { 198783, 199483 }
+local FOOD_SPELLS = { 430, 433, 167152, 160598, 160599 }
 
 -- Variables
 local summonedPetsCache = {}
 local lastSummonTime = 0
 local isPlayerDead = false
+local playerIsEating = false
+local playerIsInvisible = false
+local playerIsInCombat = false
+local playerAuras = {}
 
---- Debugging Utility
+-- Spell name cache
+local SPELL_NAME_CACHE = setmetatable({}, {
+	__index = function(self, spellID)
+		local spellInfo = C_Spell.GetSpellInfo(spellID)
+		if spellInfo then
+			rawset(self, spellID, spellInfo.name)
+			return spellInfo.name
+		end
+		namespace:DebugPrint("Spell ID not found: " .. tostring(spellID))
+		return nil
+	end,
+})
+
+-- Debugging Utility
 function namespace:DebugPrint(message)
 	if namespace:GetOption("enableDebug") then
 		namespace:Print(message)
 	end
 end
 
---- Utility Functions
+-- Check if the player has a specific aura
+local function PlayerHasAura(spellID)
+	local spellName = SPELL_NAME_CACHE[spellID]
+	return spellName and playerAuras[spellName] or false
+end
 
 -- Check if the player has an aura from a given list
 local function PlayerHasAuraInList(auraList)
-	local i = 1
-	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
-		if not aura then
-			break
+	for _, spellID in ipairs(auraList) do
+		if PlayerHasAura(spellID) then
+			return true
 		end
-		for _, spellID in ipairs(auraList) do
-			if aura.spellId == spellID then
-				return true
-			end
-		end
-		i = i + 1
 	end
 	return false
 end
@@ -107,24 +122,21 @@ local function FormatPetAnnouncement(petID)
 	return string.format("PetPartner has summoned: %s %s %s", petTypeIcon, "|T" .. petIcon .. ":16|t", petLink)
 end
 
---- Core Functions
-
--- Dismiss the currently summoned pet
 function namespace:DismissPet()
 	local currentPetGUID = C_PetJournal.GetSummonedPetGUID()
 
 	if currentPetGUID and currentPetGUID ~= "" then
 		namespace:DebugPrint("Dismissing pet with GUID: " .. currentPetGUID)
 		C_PetJournal.SummonPetByGUID(currentPetGUID)
+		ResetSummonedPetsCache()
 	else
 		namespace:DebugPrint("No pet to dismiss.")
 	end
 end
 
--- Summon a pet
-local function SummonPet()
-	if isPlayerDead then
-		namespace:DebugPrint("Player is dead. Summoning is disabled.")
+local function TrySummonPet()
+	if isPlayerDead or playerIsEating or playerIsInvisible or playerIsInCombat then
+		namespace:DebugPrint("Cannot summon pet. Dead: " .. tostring(isPlayerDead) .. ", Eating: " .. tostring(playerIsEating) .. ", Invisible: " .. tostring(playerIsInvisible) .. ", In Combat: " .. tostring(playerIsInCombat))
 		return
 	end
 
@@ -140,11 +152,6 @@ local function SummonPet()
 
 	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
 		namespace:DebugPrint("PetPartner is disabled.")
-		return
-	end
-
-	if InCombatLockdown() then
-		namespace:DebugPrint("Cannot summon a pet during combat.")
 		return
 	end
 
@@ -198,51 +205,84 @@ local function SummonPet()
 	namespace:DebugPrint("Summoned a new pet successfully!")
 end
 
---- Event Handlers
-function namespace:PLAYER_LOGIN()
-	SummonPet()
-end
-function namespace:PLAYER_REGEN_ENABLED()
-	SummonPet()
-end
-function namespace:PLAYER_REGEN_DISABLED()
-	namespace:DebugPrint("Combat started. Pet summoning is delayed.")
-end
-function namespace:ZONE_CHANGED()
-	SummonPet()
-end
-function namespace:ZONE_CHANGED_INDOORS()
-	SummonPet()
-end
-function namespace:ZONE_CHANGED_NEW_AREA()
-	SummonPet()
-end
-function namespace:PLAYER_UPDATE_RESTING()
-	SummonPet()
+-- Event Handlers
+
+function namespace:UNIT_AURA(unit)
+	if unit ~= "player" then
+		return
+	end
+
+	namespace:DebugPrint("Updating player auras...")
+	wipe(playerAuras)
+
+	local i = 1
+	while true do
+		local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+		if not aura then
+			break
+		end
+
+		if aura.name then
+			playerAuras[aura.name] = true
+		end
+		i = i + 1
+	end
+
+	playerIsEating = PlayerHasAuraInList(FOOD_SPELLS)
+	playerIsInvisible = PlayerHasAuraInList(INVIS_SPELLS)
+
+	TrySummonPet()
 end
 
--- Handle Player Death
+function namespace:PLAYER_ENTERING_WORLD()
+	TrySummonPet()
+end
+
 function namespace:PLAYER_DEAD()
 	isPlayerDead = true
 	namespace:DebugPrint("Player has died. Disabling pet summoning.")
 end
 
--- Handle Player Resurrection
 function namespace:PLAYER_UNGHOST()
 	isPlayerDead = false
 	namespace:DebugPrint("Player has resurrected. Enabling pet summoning.")
-	SummonPet()
+	TrySummonPet()
 end
 
--- Stealth Handler
 function namespace:UPDATE_STEALTH()
 	if IsStealthed() and not PlayerHasAuraInList(CAMO_SPELLS) then
 		namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
 		self:DismissPet()
 	else
-		namespace:DebugPrint("Player is not stealthed or has camouflage. Ready to summon a pet.")
-		SummonPet()
+		TrySummonPet()
 	end
+end
+
+function namespace:PLAYER_REGEN_DISABLED()
+	playerIsInCombat = true
+	namespace:DebugPrint("Combat started. Pet summoning is delayed.")
+end
+
+function namespace:PLAYER_REGEN_ENABLED()
+	playerIsInCombat = false
+	namespace:DebugPrint("Combat ended. Attempting to summon a pet.")
+	TrySummonPet()
+end
+
+function namespace:ZONE_CHANGED()
+	TrySummonPet()
+end
+
+function namespace:ZONE_CHANGED_INDOORS()
+	TrySummonPet()
+end
+
+function namespace:ZONE_CHANGED_NEW_AREA()
+	TrySummonPet()
+end
+
+function namespace:PLAYER_UPDATE_RESTING()
+	TrySummonPet()
 end
 
 function namespace:OnLoad()
