@@ -12,16 +12,18 @@ local FOOD_SPELLS = { 430, 433, 167152, 160598, 160599 }
 -- Variables
 local summonedPetsCache = {}
 local lastSummonTime = 0
+local summoningInProgress = false
 local playerStates = {
 	playerIsDead = false,
 	playerIsEating = false,
-	playerIsInvisible = false,
-	playerIsInCombat = false,
-	playerIsFlying = false,
 	playerIsFalling = false,
+	playerIsFlying = false,
+	playerIsInCombat = false,
 	playerIsInVehicle = false,
+	playerIsInvisible = false,
 	playerIsLooting = false,
 	playerIsSitting = false,
+	playerIsStealth = false,
 }
 local playerAuras = {}
 
@@ -76,19 +78,32 @@ local function IsPlayerInIgnoredInstance()
 	return not namespace:GetOption(instanceOptions[instanceType])
 end
 
+local function isPlayerInRestrictedState()
+	local disallowedStates = {
+		playerIsDead = "Player is dead",
+		playerIsEating = "Player is eating",
+		playerIsFalling = "Player is falling",
+		playerIsFlying = "Player is flying",
+		playerIsInCombat = "Player is in combat",
+		playerIsInVehicle = "Player is in a vehicle",
+		playerIsInvisible = "Player is invisible",
+		playerIsLooting = "Player is looting",
+		playerIsSitting = "Player is sitting",
+		playerIsStealth = "Player is stealth",
+	}
+
+	for state, reason in pairs(disallowedStates) do
+		if playerStates[state] then
+			return true, reason
+		end
+	end
+
+	return false
+end
+
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
 	wipe(summonedPetsCache)
-end
-
-local function ValidateBlocklistDB()
-	local expectedKeys = { "npcs" }
-	for _, key in ipairs(expectedKeys) do
-		if not PetPartnerBlocklistDB[key] or type(PetPartnerBlocklistDB[key]) ~= "table" then
-			namespace:DebugPrint("Blocklist database invalid. Initializing " .. key .. "...")
-			PetPartnerBlocklistDB[key] = {}
-		end
-	end
 end
 
 local function FormatPetAnnouncement(petID)
@@ -134,39 +149,9 @@ local function UpdatePlayerState(key, value)
 	end
 end
 
-local function UpdatePlayerVehicleState(unit)
-	if unit == "player" then
-		local inVehicle = UnitInVehicle("player")
-		UpdatePlayerState("playerIsInVehicle", inVehicle)
-		namespace:DebugPrint("Player vehicle state updated. In Vehicle: " .. tostring(inVehicle))
-	end
-end
-
 local function UpdateDynamicPlayerStates()
-	local isFlying = IsFlying() or false
-	local isFalling = IsFalling() or false
-
-	if playerStates.playerIsFlying ~= isFlying then
-		UpdatePlayerState("playerIsFlying", isFlying)
-	end
-
-	if playerStates.playerIsFalling ~= isFalling then
-		UpdatePlayerState("playerIsFalling", isFalling)
-	end
-end
-
-local function LogPlayerStates()
-	namespace:DebugPrint("Player States: " .. table.concat({
-		"Dead = " .. tostring(playerStates.playerIsDead),
-		"Eating = " .. tostring(playerStates.playerIsEating),
-		"Falling = " .. tostring(playerStates.playerIsFalling),
-		"Flying = " .. tostring(playerStates.playerIsFlying),
-		"InCombat = " .. tostring(playerStates.playerIsInCombat),
-		"InVehicle = " .. tostring(playerStates.playerIsInVehicle),
-		"Invisible = " .. tostring(playerStates.playerIsInvisible),
-		"Looting = " .. tostring(playerStates.playerIsLooting),
-		"Sitting = " .. tostring(playerStates.playerIsSitting),
-	}, ", "))
+	UpdatePlayerState("playerIsFlying", IsFlying())
+	UpdatePlayerState("playerIsFalling", IsFalling())
 end
 
 -- Pet Management
@@ -182,31 +167,10 @@ function namespace:DismissPet()
 	end
 end
 
-local function hasDisallowedState()
-	local disallowedStates = {
-		playerIsDead = "Player is dead",
-		playerIsEating = "Player is eating",
-		playerIsFalling = "Player is falling",
-		playerIsFlying = "Player is flying",
-		playerIsInCombat = "Player is in combat",
-		playerIsInVehicle = "Player is in a vehicle",
-		playerIsInvisible = "Player is invisible",
-		playerIsLooting = "Player is looting",
-		playerIsSitting = "Player is sitting",
-	}
-
-	for state, reason in pairs(disallowedStates) do
-		if playerStates[state] then
-			namespace:DebugPrint("Cannot summon pet: " .. reason)
-			return true
-		end
-	end
-	return false
-end
-
 local function CanSummonPet()
-	if hasDisallowedState() then
-		return false, "Cannot summon due to disallowed state."
+	local restricted, reason = isPlayerInRestrictedState()
+	if restricted then
+		return false, reason
 	end
 
 	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
@@ -222,7 +186,9 @@ local function CanSummonPet()
 	end
 
 	local summonCooldown = namespace:GetOption(OPTION_SUMMON_COOLDOWN) or 1
-	if GetTime() - lastSummonTime < summonCooldown then
+	local timeSinceLastSummon = GetTime() - lastSummonTime
+	if timeSinceLastSummon < summonCooldown then
+		namespace:DebugPrint("Summon is on cooldown. Time left: " .. (summonCooldown - timeSinceLastSummon), "CanSummonPet")
 		return false, "Summon is on cooldown."
 	end
 
@@ -230,59 +196,77 @@ local function CanSummonPet()
 end
 
 local function TrySummonPet()
-	LogPlayerStates()
-
-	local canSummon, reason = CanSummonPet()
-	if not canSummon then
-		namespace:DebugPrint(reason)
+	if summoningInProgress then
+		namespace:DebugPrint("Summoning already in progress. Ignoring redundant calls.", "TrySummonPet")
 		return
 	end
 
+	local canSummon, reason = CanSummonPet()
+	if not canSummon then
+		namespace:DebugPrint(reason, "TrySummonPet")
+		return
+	end
+
+	summoningInProgress = true
 	lastSummonTime = GetTime()
-	namespace:DebugPrint("Processing summoning delay...")
-	C_Timer.After(1, function()
-		namespace:DebugPrint("Attempting to summon a pet after delay...")
 
-		ValidateBlocklistDB()
+	namespace:DebugPrint("Processing summoning delay...", "TrySummonPet")
+	C_Timer.After(2, function()
+		summoningInProgress = false
 
-		local numPets = C_PetJournal.GetNumPets()
-		local blacklist = PetPartnerBlocklistDB.npcs or {}
+		namespace:DebugPrint("Attempting to summon a pet after delay...", "TrySummonPet")
+
 		local summonFavoritesOnly = namespace:GetOption(OPTION_SUMMON_FAVORITES_ONLY)
 		local summonablePets = {}
 
+		local numPets = C_PetJournal.GetNumPets()
 		for i = 1, numPets do
 			local petID, _, owned, _, _, favorite, _, _, _, _, companionID = C_PetJournal.GetPetInfoByIndex(i)
 			local isSummonable, error = C_PetJournal.GetPetSummonInfo(petID)
 
-			if petID and owned and isSummonable and error == Enum.PetJournalError.None and not blacklist[companionID] then
+			if petID and owned and isSummonable and error == Enum.PetJournalError.None and not PetPartnerBlocklistDB.npcs[companionID] then
 				if (not summonFavoritesOnly or favorite) and not summonedPetsCache[petID] then
 					table.insert(summonablePets, petID)
 				end
 			end
 		end
 
+		-- Summon pet
 		if #summonablePets == 0 then
-			namespace:DebugPrint("No valid pets found. Summoning random.")
+			namespace:DebugPrint("No valid pets found. Summoning random pet.", "TrySummonPet")
 			C_PetJournal.SummonRandomPet(summonFavoritesOnly)
-			return
-		end
+		else
+			local petToSummon = summonablePets[math.random(#summonablePets)]
+			C_PetJournal.SummonPetByGUID(petToSummon)
+			summonedPetsCache[petToSummon] = true
 
-		local petToSummon = summonablePets[math.random(#summonablePets)]
-		C_PetJournal.SummonPetByGUID(petToSummon)
-		summonedPetsCache[petToSummon] = true
-
-		if namespace:GetOption(OPTION_SUMMON_ANNOUNCEMENTS) then
-			local announcement = FormatPetAnnouncement(petToSummon)
-			if announcement then
-				namespace:Print(announcement)
+			-- Print announcement
+			if namespace:GetOption(OPTION_SUMMON_ANNOUNCEMENTS) then
+				local announcement = FormatPetAnnouncement(petToSummon)
+				if announcement then
+					namespace:Print(announcement)
+				end
 			end
+			namespace:DebugPrint("Summoned a new pet successfully!", "TrySummonPet")
 		end
-
-		namespace:DebugPrint("Summoned a new pet successfully!")
 	end)
 end
 
--- 1. Aura Updates
+local function HandleSummoningEvents(event)
+	namespace:DebugPrint("Event triggered: " .. (event or "Unknown"), "EventHandler")
+
+	if summoningInProgress then
+		namespace:DebugPrint("Summoning already in progress. Ignoring redundant calls.", "EventHandler")
+		return
+	end
+
+	if CanSummonPet() then
+		TrySummonPet()
+	else
+		namespace:DebugPrint("Cannot summon pet. Conditions not met.", "EventHandler")
+	end
+end
+
 function namespace:UNIT_AURA(unit)
 	if unit ~= "player" then
 		return
@@ -293,7 +277,7 @@ function namespace:UNIT_AURA(unit)
 
 	local i = 1
 	while true do
-		local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL")
+		local aura = C_UnitAuras.GetAuraDataByIndex("player", i, "HELPFUL|PLAYER")
 		if not aura then
 			break
 		end
@@ -305,106 +289,91 @@ function namespace:UNIT_AURA(unit)
 
 	UpdatePlayerState("playerIsEating", PlayerHasAura(FOOD_SPELLS))
 	UpdatePlayerState("playerIsInvisible", PlayerHasAura(INVIS_SPELLS))
-	TrySummonPet()
-end
+	UpdatePlayerState("playerIsInvisible", PlayerHasAura(CAMO_SPELLS))
+	UpdatePlayerState("playerIsDead", PlayerHasAura(5384))
 
--- 2. Combat States
-function namespace:PLAYER_REGEN_DISABLED()
-	UpdatePlayerState("playerIsInCombat", true)
+	HandleSummoningEvents("UNIT_AURA")
 end
 
 function namespace:PLAYER_REGEN_ENABLED()
 	UpdatePlayerState("playerIsInCombat", false)
-	TrySummonPet()
+	HandleSummoningEvents("PLAYER_REGEN_ENABLED")
 end
 
--- 3. World States
+function namespace:PLAYER_REGEN_DISABLED()
+	UpdatePlayerState("playerIsInCombat", true)
+end
+
 function namespace:PLAYER_ENTERING_WORLD(_, isReloadingUi)
 	if isReloadingUi then
-		namespace:DebugPrint("Player reloaded UI. Pet summoning is disabled.")
+		ResetSummonedPetsCache()
 		return
 	end
-
-	if IsPlayerInIgnoredInstance() then
-		namespace:DebugPrint("Player is in a restricted instance. Pet summoning is disabled.")
-		return
-	end
-	namespace:DebugPrint("Player entering the world.")
-	TrySummonPet()
+	HandleSummoningEvents("PLAYER_ENTERING_WORLD")
 end
 
--- 4. Player Behavior
 function namespace:PLAYER_STARTED_MOVING()
 	UpdatePlayerState("playerIsSitting", false)
-	namespace:DebugPrint("Player started moving. Sitting state updated to false.")
+	HandleSummoningEvents("PLAYER_STARTED_MOVING")
 end
 
 function namespace:PLAYER_FLAGS_CHANGED()
-	if UnitIsAFK("player") and not playerStates.playerIsSitting then
-		UpdatePlayerState("playerIsSitting", true)
-		namespace:DebugPrint("Player is now sitting (AFK).")
-	elseif not UnitIsAFK("player") and playerStates.playerIsSitting then
-		UpdatePlayerState("playerIsSitting", false)
-		namespace:DebugPrint("Player is no longer AFK. Sitting state updated to false.")
-	end
+	local isAFK = UnitIsAFK("player")
+	UpdatePlayerState("playerIsSitting", isAFK)
+	HandleSummoningEvents("PLAYER_FLAGS_CHANGED")
 end
 
--- 5. Player States
 function namespace:PLAYER_DEAD()
 	UpdatePlayerState("playerIsDead", true)
+	namespace:DebugPrint("Player is dead. Pet summoning disabled.")
 end
 
 function namespace:PLAYER_UNGHOST()
 	UpdatePlayerState("playerIsDead", false)
-	TrySummonPet()
+	HandleSummoningEvents("PLAYER_UNGHOST")
 end
 
 function namespace:UPDATE_STEALTH()
-	local dismissWhileStealthed = namespace:GetOption("dismissWhileStealthed")
-	if IsStealthed() and not PlayerHasAura(CAMO_SPELLS) then
-		if dismissWhileStealthed then
-			namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
-			self:DismissPet()
-		else
-			namespace:DebugPrint("Player is stealthed but dismissing pets while stealthed is disabled.")
-		end
+	if IsStealthed() and namespace:GetOption("dismissWhileStealthed") then
+		UpdatePlayerState("playerIsStealth", true)
+		namespace:DebugPrint("Player is stealthed. Dismissing pet.")
+		self:DismissPet()
 	else
-		TrySummonPet()
+		UpdatePlayerState("playerIsStealth", false)
+		HandleSummoningEvents("UPDATE_STEALTH")
 	end
 end
 
--- 6. Interaction States
 function namespace:UNIT_ENTERED_VEHICLE(unit)
 	if unit == "player" then
-		UpdatePlayerVehicleState(unit)
+		UpdatePlayerState("playerIsInVehicle", true)
 	end
 end
 
 function namespace:UNIT_EXITED_VEHICLE(unit)
 	if unit == "player" then
-		UpdatePlayerVehicleState(unit)
-		if not playerStates.playerIsInVehicle then
-			TrySummonPet()
-		end
+		UpdatePlayerState("playerIsInVehicle", false)
+		HandleSummoningEvents("UNIT_EXITED_VEHICLE")
 	end
 end
 
 function namespace:LOOT_OPENED()
 	UpdatePlayerState("playerIsLooting", true)
+	namespace:DebugPrint("Player is looting. Pet summoning disabled.")
 end
 
 function namespace:LOOT_CLOSED()
 	UpdatePlayerState("playerIsLooting", false)
-	TrySummonPet()
+	HandleSummoningEvents("LOOT_CLOSED")
 end
 
 function namespace:PLAYER_UPDATE_RESTING()
-	TrySummonPet()
+	HandleSummoningEvents("PLAYER_UPDATE_RESTING")
 end
 
+-- Initialization
 function namespace:OnLoad()
 	namespace:DebugPrint("PetPartner addon loaded. Initializing...")
-	ValidateBlocklistDB()
 	ResetSummonedPetsCache()
 
 	C_Timer.NewTicker(0.5, UpdateDynamicPlayerStates)
