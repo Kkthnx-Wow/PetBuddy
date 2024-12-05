@@ -13,7 +13,7 @@ local FOOD_SPELLS = { 430, 433, 167152, 160598, 160599 }
 local summonedPetsCache = {}
 local lastSummonTime = 0
 local playerStates = {
-	isPlayerDead = false,
+	playerIsDead = false,
 	playerIsEating = false,
 	playerIsInvisible = false,
 	playerIsInCombat = false,
@@ -39,23 +39,23 @@ local SPELL_NAME_CACHE = setmetatable({}, {
 })
 
 -- Debugging Utility
-function namespace:DebugPrint(message)
+function namespace:DebugPrint(message, context)
 	if namespace:GetOption("enableDebug") then
-		namespace:Print(message)
+		local prefix = context and ("[" .. context .. "] ") or "[PetPartner Debug]: "
+		namespace:Print(prefix .. message)
 	end
 end
 
 -- Utility Functions
-local function PlayerHasAura(spellID)
-	local spellName = SPELL_NAME_CACHE[spellID]
-	return spellName and playerAuras[spellName] or false
-end
-
-local function PlayerHasAuraInList(auraList)
-	for _, spellID in ipairs(auraList) do
-		if PlayerHasAura(spellID) then
-			return true
+local function PlayerHasAura(spellIDOrList)
+	if type(spellIDOrList) == "table" then
+		for _, spellID in ipairs(spellIDOrList) do
+			if playerAuras[SPELL_NAME_CACHE[spellID]] then
+				return true
+			end
 		end
+	else
+		return playerAuras[SPELL_NAME_CACHE[spellIDOrList]] or false
 	end
 	return false
 end
@@ -75,6 +75,26 @@ local function IsPlayerInIgnoredInstance()
 
 	return not namespace:GetOption(instanceOptions[instanceType])
 end
+
+-- local function ShouldAttemptSummon()
+-- 	local locationChecks = {
+-- 		city = IsResting,
+-- 		battleground = function()
+-- 			return C_PvP.IsBattleground() or C_PvP.IsArena()
+-- 		end,
+-- 		instance = function()
+-- 			local inInstance, instanceType = IsInInstance()
+-- 			return inInstance and (instanceType == "party" or instanceType == "raid")
+-- 		end,
+-- 		any = function()
+-- 			return true
+-- 		end,
+-- 	}
+
+-- 	local locSetting = namespace:GetOption("locationPreference") or "any"
+-- 	local checkFunction = locationChecks[locSetting] or locationChecks["any"]
+-- 	return checkFunction()
+-- end
 
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
@@ -157,13 +177,13 @@ end
 
 local function LogPlayerStates()
 	namespace:DebugPrint("Player States: " .. table.concat({
-		"Dead = " .. tostring(playerStates.isPlayerDead),
+		"Dead = " .. tostring(playerStates.playerIsDead),
 		"Eating = " .. tostring(playerStates.playerIsEating),
-		"Invisible = " .. tostring(playerStates.playerIsInvisible),
-		"InCombat = " .. tostring(playerStates.playerIsInCombat),
-		"Flying = " .. tostring(playerStates.playerIsFlying),
 		"Falling = " .. tostring(playerStates.playerIsFalling),
+		"Flying = " .. tostring(playerStates.playerIsFlying),
+		"InCombat = " .. tostring(playerStates.playerIsInCombat),
 		"InVehicle = " .. tostring(playerStates.playerIsInVehicle),
+		"Invisible = " .. tostring(playerStates.playerIsInvisible),
 		"Looting = " .. tostring(playerStates.playerIsLooting),
 		"Sitting = " .. tostring(playerStates.playerIsSitting),
 	}, ", "))
@@ -182,17 +202,15 @@ function namespace:DismissPet()
 	end
 end
 
-local function TrySummonPet()
-	LogPlayerStates()
-
+local function hasDisallowedState()
 	local disallowedStates = {
-		isPlayerDead = "Player is dead",
+		playerIsDead = "Player is dead",
 		playerIsEating = "Player is eating",
-		playerIsInvisible = "Player is invisible",
-		playerIsInCombat = "Player is in combat",
-		playerIsFlying = "Player is flying",
 		playerIsFalling = "Player is falling",
+		playerIsFlying = "Player is flying",
+		playerIsInCombat = "Player is in combat",
 		playerIsInVehicle = "Player is in a vehicle",
+		playerIsInvisible = "Player is invisible",
 		playerIsLooting = "Player is looting",
 		playerIsSitting = "Player is sitting",
 	}
@@ -200,32 +218,47 @@ local function TrySummonPet()
 	for state, reason in pairs(disallowedStates) do
 		if playerStates[state] then
 			namespace:DebugPrint("Cannot summon pet: " .. reason)
-			return
+			return true
 		end
+	end
+	return false
+end
+
+local function CanSummonPet()
+	if hasDisallowedState() then
+		return false, "Cannot summon due to disallowed state."
+	end
+
+	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
+		return false, "Addon is disabled."
+	end
+
+	if IsPlayerInIgnoredInstance() then
+		return false, "Ignored instance type for summoning."
+	end
+
+	if C_PetJournal.GetSummonedPetGUID() then
+		return false, "A pet is already summoned."
 	end
 
 	local summonCooldown = namespace:GetOption(OPTION_SUMMON_COOLDOWN) or 1
 	if GetTime() - lastSummonTime < summonCooldown then
-		namespace:DebugPrint("SummonPet is on cooldown. Ignoring redundant calls.")
+		return false, "Summon is on cooldown."
+	end
+
+	return true
+end
+
+local function TrySummonPet()
+	LogPlayerStates()
+
+	local canSummon, reason = CanSummonPet()
+	if not canSummon then
+		namespace:DebugPrint(reason)
 		return
 	end
+
 	lastSummonTime = GetTime()
-
-	if not namespace:GetOption(OPTION_ENABLE_ADDON) then
-		namespace:DebugPrint("PetPartner is disabled.")
-		return
-	end
-
-	if IsPlayerInIgnoredInstance() then
-		namespace:DebugPrint("Ignored summoning pets in the current instance.")
-		return
-	end
-
-	if C_PetJournal.GetSummonedPetGUID() then
-		namespace:DebugPrint("A pet is already summoned.")
-		return
-	end
-
 	namespace:DebugPrint("Processing summoning delay...")
 	C_Timer.After(1, function()
 		namespace:DebugPrint("Attempting to summon a pet after delay...")
@@ -249,7 +282,7 @@ local function TrySummonPet()
 		end
 
 		if #summonablePets == 0 then
-			namespace:DebugPrint("No valid pets found in the custom filter. Summoning a random pet.")
+			namespace:DebugPrint("No valid pets found. Summoning random.")
 			C_PetJournal.SummonRandomPet(summonFavoritesOnly)
 			return
 		end
@@ -268,6 +301,15 @@ local function TrySummonPet()
 		namespace:DebugPrint("Summoned a new pet successfully!")
 	end)
 end
+
+-- local function HandleLocationBasedSummon()
+-- 	local canSummon, reason = ShouldAttemptSummon()
+-- 	if canSummon then
+-- 		TrySummonPet()
+-- 	else
+-- 		namespace:DebugPrint(reason, "LocationCheck")
+-- 	end
+-- end
 
 -- 1. Aura Updates
 function namespace:UNIT_AURA(unit)
@@ -290,8 +332,8 @@ function namespace:UNIT_AURA(unit)
 		i = i + 1
 	end
 
-	UpdatePlayerState("playerIsEating", PlayerHasAuraInList(FOOD_SPELLS))
-	UpdatePlayerState("playerIsInvisible", PlayerHasAuraInList(INVIS_SPELLS))
+	UpdatePlayerState("playerIsEating", PlayerHasAura(FOOD_SPELLS))
+	UpdatePlayerState("playerIsInvisible", PlayerHasAura(INVIS_SPELLS))
 	TrySummonPet()
 end
 
@@ -306,7 +348,12 @@ function namespace:PLAYER_REGEN_ENABLED()
 end
 
 -- 3. World States
-function namespace:PLAYER_ENTERING_WORLD()
+function namespace:PLAYER_ENTERING_WORLD(_, isReloadingUi)
+	if isReloadingUi then
+		namespace:DebugPrint("Player reloaded UI. Pet summoning is disabled.")
+		return
+	end
+
 	if IsPlayerInIgnoredInstance() then
 		namespace:DebugPrint("Player is in a restricted instance. Pet summoning is disabled.")
 		return
@@ -315,17 +362,17 @@ function namespace:PLAYER_ENTERING_WORLD()
 	TrySummonPet()
 end
 
-function namespace:ZONE_CHANGED()
-	TrySummonPet()
-end
+-- function namespace:ZONE_CHANGED()
+-- 	HandleLocationBasedSummon()
+-- end
 
-function namespace:ZONE_CHANGED_INDOORS()
-	TrySummonPet()
-end
+-- function namespace:ZONE_CHANGED_INDOORS()
+-- 	HandleLocationBasedSummon()
+-- end
 
-function namespace:ZONE_CHANGED_NEW_AREA()
-	TrySummonPet()
-end
+-- function namespace:ZONE_CHANGED_NEW_AREA()
+-- 	HandleLocationBasedSummon()
+-- end
 
 -- 4. Player Behavior
 function namespace:PLAYER_STARTED_MOVING()
@@ -345,17 +392,17 @@ end
 
 -- 5. Player States
 function namespace:PLAYER_DEAD()
-	UpdatePlayerState("isPlayerDead", true)
+	UpdatePlayerState("playerIsDead", true)
 end
 
 function namespace:PLAYER_UNGHOST()
-	UpdatePlayerState("isPlayerDead", false)
+	UpdatePlayerState("playerIsDead", false)
 	TrySummonPet()
 end
 
 function namespace:UPDATE_STEALTH()
 	local dismissWhileStealthed = namespace:GetOption("dismissWhileStealthed")
-	if IsStealthed() and not PlayerHasAuraInList(CAMO_SPELLS) then
+	if IsStealthed() and not PlayerHasAura(CAMO_SPELLS) then
 		if dismissWhileStealthed then
 			namespace:DebugPrint("Player is stealthed without camouflage. Dismissing summoned pet.")
 			self:DismissPet()
