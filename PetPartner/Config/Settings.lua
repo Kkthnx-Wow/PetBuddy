@@ -70,19 +70,6 @@ namespace:RegisterSettings("PetPartnerDB", {
 		tooltip = "Enable or disable dismissing pets while the player is stealthed.",
 		default = true,
 	},
-	-- {
-	-- 	key = "locationPreference",
-	-- 	type = "menu",
-	-- 	title = "Location Preference",
-	-- 	tooltip = "Choose where pets should be summoned.",
-	-- 	default = "any",
-	-- 	options = {
-	-- 		{ value = "any", label = "Anywhere" },
-	-- 		{ value = "city", label = "Cities Only" },
-	-- 		{ value = "battleground", label = "Battlegrounds Only" },
-	-- 		{ value = "instance", label = "Instances Only" },
-	-- 	},
-	-- },
 })
 
 -- Register Slash Command for Settings

@@ -76,26 +76,6 @@ local function IsPlayerInIgnoredInstance()
 	return not namespace:GetOption(instanceOptions[instanceType])
 end
 
--- local function ShouldAttemptSummon()
--- 	local locationChecks = {
--- 		city = IsResting,
--- 		battleground = function()
--- 			return C_PvP.IsBattleground() or C_PvP.IsArena()
--- 		end,
--- 		instance = function()
--- 			local inInstance, instanceType = IsInInstance()
--- 			return inInstance and (instanceType == "party" or instanceType == "raid")
--- 		end,
--- 		any = function()
--- 			return true
--- 		end,
--- 	}
-
--- 	local locSetting = namespace:GetOption("locationPreference") or "any"
--- 	local checkFunction = locationChecks[locSetting] or locationChecks["any"]
--- 	return checkFunction()
--- end
-
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
 	wipe(summonedPetsCache)
@@ -302,15 +282,6 @@ local function TrySummonPet()
 	end)
 end
 
--- local function HandleLocationBasedSummon()
--- 	local canSummon, reason = ShouldAttemptSummon()
--- 	if canSummon then
--- 		TrySummonPet()
--- 	else
--- 		namespace:DebugPrint(reason, "LocationCheck")
--- 	end
--- end
-
 -- 1. Aura Updates
 function namespace:UNIT_AURA(unit)
 	if unit ~= "player" then
@@ -361,18 +332,6 @@ function namespace:PLAYER_ENTERING_WORLD(_, isReloadingUi)
 	namespace:DebugPrint("Player entering the world.")
 	TrySummonPet()
 end
-
--- function namespace:ZONE_CHANGED()
--- 	HandleLocationBasedSummon()
--- end
-
--- function namespace:ZONE_CHANGED_INDOORS()
--- 	HandleLocationBasedSummon()
--- end
-
--- function namespace:ZONE_CHANGED_NEW_AREA()
--- 	HandleLocationBasedSummon()
--- end
 
 -- 4. Player Behavior
 function namespace:PLAYER_STARTED_MOVING()
