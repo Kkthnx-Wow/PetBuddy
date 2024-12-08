@@ -70,6 +70,13 @@ namespace:RegisterSettings("PetPartnerDB", {
 		tooltip = "Enable or disable dismissing pets while the player is stealthed.",
 		default = true,
 	},
+	{
+		key = "onlySummonInCities", -- New option
+		type = "toggle",
+		title = "Only Summon Pets in Cities", -- Title displayed in the settings UI
+		tooltip = "Only allow pets to be summoned while in main cities.", -- Description displayed when hovering over the option
+		default = false, -- Default value (unchecked)
+	},
 })
 
 -- Register Slash Command for Settings

@@ -5,9 +5,25 @@ local OPTION_ENABLE_ADDON = "enableAddon"
 local OPTION_SUMMON_COOLDOWN = "summonCooldown"
 local OPTION_SUMMON_ANNOUNCEMENTS = "showSummonAnnouncements"
 local OPTION_SUMMON_FAVORITES_ONLY = "summonFavoritesOnly"
+local OPTION_ONLY_SUMMON_IN_CITIES = "onlySummonInCities" -- New option
 local INVIS_SPELLS = { 66, 11392, 3680 }
 local CAMO_SPELLS = { 198783, 199483 }
 local FOOD_SPELLS = { 430, 433, 167152, 160598, 160599 }
+
+-- List of known main city zone IDs
+local MAIN_CITIES = {
+	[84] = true, -- Stormwind City
+	[85] = true, -- Orgrimmar - Orgrimmar
+	[86] = true, -- Orgrimmar - Cleft of Shadow
+	[87] = true, -- Ironforge
+	[88] = true, -- Thunder Bluff
+	[89] = true, -- Darnassus
+	[90] = true, -- Undercity
+	[1409] = true, -- Exile's Reach
+	[1727] = true, -- The North Sea
+	[2112] = true, -- Valdrakken
+	[2339] = true, -- Dornogal
+}
 
 -- Variables
 local summonedPetsCache = {}
@@ -101,6 +117,20 @@ local function isPlayerInRestrictedState()
 	return false
 end
 
+-- Check if player is in a main city
+local function IsPlayerInMainCity()
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if not mapID then
+		return false
+	end
+
+	if MAIN_CITIES[mapID] then
+		return true
+	end
+
+	return false
+end
+
 local function ResetSummonedPetsCache()
 	namespace:DebugPrint("Resetting summoned pets cache.")
 	wipe(summonedPetsCache)
@@ -179,6 +209,10 @@ local function CanSummonPet()
 
 	if IsPlayerInIgnoredInstance() then
 		return false, "Ignored instance type for summoning."
+	end
+
+	if namespace:GetOption(OPTION_ONLY_SUMMON_IN_CITIES) and not IsPlayerInMainCity() then
+		return false, "Player is not in a main city."
 	end
 
 	if C_PetJournal.GetSummonedPetGUID() then
